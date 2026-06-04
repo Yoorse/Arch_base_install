@@ -15,7 +15,7 @@ HOSTNAME="archlinux"
 TIMEZONE="Europe/Copenhagen"
 LOCALE="en_US.UTF-8"
 KEYMAP="dk"
-USERNAME="username"
+USERNAME="toor"
 USER_PASSWORD="changeme"
 ROOT_PASSWORD="changeme"
 # ──────────────────────────────────────────────────────────────────────────────
@@ -67,9 +67,9 @@ pacstrap /mnt \
 echo "==> Generating fstab"
 genfstab -U /mnt >> /mnt/etc/fstab
 
-echo "==> Entering chroot"
-arch-chroot /mnt /bin/bash <<CHROOT
-
+echo "==> Writing chroot script"
+cat > /mnt/chroot-setup.sh <<EOF
+#!/bin/bash
 set -euo pipefail
 
 echo "==> Setting timezone"
@@ -84,11 +84,11 @@ echo "KEYMAP=${KEYMAP}" > /etc/vconsole.conf
 
 echo "==> Setting hostname"
 echo "${HOSTNAME}" > /etc/hostname
-cat <<EOF > /etc/hosts
+cat <<HOSTS > /etc/hosts
 127.0.0.1   localhost
 ::1         localhost
 127.0.1.1   ${HOSTNAME}.localdomain ${HOSTNAME}
-EOF
+HOSTS
 
 echo "==> Enabling NetworkManager"
 systemctl enable NetworkManager
@@ -102,10 +102,17 @@ useradd -m -G sudo,network,audio "${USERNAME}"
 echo "${USERNAME}:${USER_PASSWORD}" | chpasswd
 echo "root:${ROOT_PASSWORD}" | chpasswd
 
-echo "==> Enabling sudo for wheel/sudo group"
+echo "==> Enabling sudo for sudo group"
 sed -i 's/^# %sudo/%sudo/' /etc/sudoers
 
-CHROOT
+echo "==> Cleaning up"
+rm /chroot-setup.sh
+EOF
+
+chmod +x /mnt/chroot-setup.sh
+
+echo "==> Entering chroot"
+arch-chroot /mnt /bin/bash /chroot-setup.sh
 
 echo ""
 echo "==> Installation complete!"
