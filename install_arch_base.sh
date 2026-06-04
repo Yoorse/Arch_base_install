@@ -15,7 +15,7 @@ HOSTNAME="archlinux"
 TIMEZONE="Europe/Copenhagen"
 LOCALE="en_US.UTF-8"
 KEYMAP="dk"
-USERNAME="toor"
+USERNAME="username"
 USER_PASSWORD="changeme"
 ROOT_PASSWORD="changeme"
 # ──────────────────────────────────────────────────────────────────────────────
