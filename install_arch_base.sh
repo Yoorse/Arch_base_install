@@ -26,16 +26,6 @@ parted -s "$DISK" \
     mkpart primary btrfs 1MiB 100% \
     set 1 boot on
 
-# Leave space at end for swap inside the OS via a swapfile, or add a swap partition:
-# If you want a dedicated swap partition, adjust the above and uncomment below:
-#
-# parted -s "$DISK" \
-#     mklabel msdos \
-#     mkpart primary btrfs 1MiB 90% \
-#     mkpart primary linux-swap 90% 100% \
-#     set 1 boot on
-# mkswap "${DISK}2"
-
 echo "==> Formatting ${DISK}1 as Btrfs"
 mkfs.btrfs -f "${DISK}1"
 
@@ -48,9 +38,9 @@ btrfs subvolume create /mnt/@home
 umount /mnt
 
 echo "==> Mounting subvolumes"
-mount -o subvol=@ "${DISK}1" /mnt
+mount -o subvol=@,defaults,noatime "${DISK}1" /mnt
 mkdir -p /mnt/home
-mount -o subvol=@home "${DISK}1" /mnt/home
+mount -o subvol=@home,defaults,noatime "${DISK}1" /mnt/home
 
 echo "==> Installing base system"
 pacstrap /mnt \
@@ -93,9 +83,15 @@ HOSTS
 echo "==> Enabling NetworkManager"
 systemctl enable NetworkManager
 
+echo "==> Generating initramfs"
+mkinitcpio -P
+
 echo "==> Installing GRUB (legacy BIOS)"
-grub-install --target=i386-pc ${DISK}
+grub-install --target=i386-pc --recheck --no-floppy ${DISK}
 grub-mkconfig -o /boot/grub/grub.cfg
+
+echo "==> Verifying GRUB modules"
+ls /boot/grub/i386-pc/
 
 echo "==> Creating user: ${USERNAME}"
 useradd -m -G sudo,network,audio "${USERNAME}"
