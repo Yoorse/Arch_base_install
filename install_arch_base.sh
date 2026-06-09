@@ -1,8 +1,8 @@
 #!/bin/bash
 # Arch Linux minimal install script
 # - Legacy BIOS / MBR
-# - Btrfs with @ and @home subvolumes (no compression)
-# - User: toor (sudo, network, audio)
+# - EXT4 root partition
+# - 8GB swap on first partition
 #
 # Run this from the Arch live ISO as root.
 # Usage: bash arch-install.sh
@@ -15,32 +15,23 @@ HOSTNAME="archlinux"
 TIMEZONE="Europe/Copenhagen"
 LOCALE="en_US.UTF-8"
 KEYMAP="dk"
-USERNAME="username"
-USER_PASSWORD="changeme"
 ROOT_PASSWORD="changeme"
 # ──────────────────────────────────────────────────────────────────────────────
 
 echo "==> Setting up partitions on $DISK"
 parted -s "$DISK" \
     mklabel msdos \
-    mkpart primary btrfs 1MiB 100% \
-    set 1 boot on
+    mkpart primary linux-swap 1MiB 8GiB \
+    mkpart primary ext4 8GiB 100% \
+    set 2 boot on
 
-echo "==> Formatting ${DISK}1 as Btrfs"
-mkfs.btrfs -f "${DISK}1"
+echo "==> Formatting partitions"
+mkswap "${DISK}1"
+mkfs.ext4 -F "${DISK}2"
 
-echo "==> Mounting and creating subvolumes"
-mount "${DISK}1" /mnt
-
-btrfs subvolume create /mnt/@
-btrfs subvolume create /mnt/@home
-
-umount /mnt
-
-echo "==> Mounting subvolumes"
-mount -o subvol=@,defaults,noatime "${DISK}1" /mnt
-mkdir -p /mnt/home
-mount -o subvol=@home,defaults,noatime "${DISK}1" /mnt/home
+echo "==> Mounting partitions"
+mount "${DISK}2" /mnt
+swapon "${DISK}1"
 
 echo "==> Installing base system"
 pacstrap /mnt \
@@ -49,7 +40,6 @@ pacstrap /mnt \
     linux \
     linux-firmware \
     grub \
-    btrfs-progs \
     networkmanager \
     sudo \
     vim
@@ -93,9 +83,7 @@ grub-mkconfig -o /boot/grub/grub.cfg
 echo "==> Verifying GRUB modules"
 ls /boot/grub/i386-pc/
 
-echo "==> Creating user: ${USERNAME}"
-useradd -m -G sudo,network,audio "${USERNAME}"
-echo "${USERNAME}:${USER_PASSWORD}" | chpasswd
+echo "==> Setting root password"
 echo "root:${ROOT_PASSWORD}" | chpasswd
 
 echo "==> Enabling sudo for sudo group"
@@ -113,4 +101,4 @@ arch-chroot /mnt /bin/bash /chroot-setup.sh
 echo ""
 echo "==> Installation complete!"
 echo "    Reboot and remove the live media."
-echo "    Login as: ${USERNAME}"
+echo "    Login as root and create your user."
