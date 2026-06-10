@@ -11,7 +11,8 @@
 set -euo pipefail
 
 # ─── Configuration ────────────────────────────────────────────────────────────
-DISK="/dev/sda"
+DISK="/dev/nvme0n1"
+PART="${DISK}p"
 SWAP_SIZE="16GiB"
 HOSTNAME="archlinux"
 TIMEZONE="Europe/Copenhagen"
@@ -29,12 +30,12 @@ parted -s "$DISK" \
     mkpart primary btrfs $((512 + 16384))MiB 100%
 
 echo "==> Formatting partitions"
-mkfs.fat -F32 "${DISK}1"
-mkswap "${DISK}2"
-mkfs.btrfs -f "${DISK}3"
+mkfs.fat -F32 "${PART}1"
+mkswap "${PART}2"
+mkfs.btrfs -f "${PART}3"
 
 echo "==> Creating Btrfs subvolumes"
-mount "${DISK}3" /mnt
+mount "${PART}3" /mnt
 
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
@@ -42,12 +43,12 @@ btrfs subvolume create /mnt/@home
 umount /mnt
 
 echo "==> Mounting subvolumes"
-mount -o subvol=@,defaults,noatime,compress=zstd "${DISK}3" /mnt
+mount -o subvol=@,defaults,noatime,compress=zstd "${PART}3" /mnt
 mkdir -p /mnt/home
-mount -o subvol=@home,defaults,noatime,compress=zstd "${DISK}3" /mnt/home
+mount -o subvol=@home,defaults,noatime,compress=zstd "${PART}3" /mnt/home
 mkdir -p /mnt/boot/efi
-mount "${DISK}1" /mnt/boot/efi
-swapon "${DISK}2"
+mount "${PART}1" /mnt/boot/efi
+swapon "${PART}2"
 
 echo "==> Installing base system"
 pacstrap /mnt \
@@ -99,7 +100,7 @@ echo "==> Generating initramfs"
 mkinitcpio -P
 
 echo "==> Adding resume parameter to GRUB"
-SWAP_UUID=\$(blkid -s UUID -o value ${DISK}2)
+SWAP_UUID=\$(blkid -s UUID -o value ${PART}2)
 sed -i "s|GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet\"|GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet resume=UUID=\$SWAP_UUID\"|" /etc/default/grub
 
 echo "==> Installing GRUB (UEFI)"
