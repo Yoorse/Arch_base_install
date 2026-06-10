@@ -46,7 +46,8 @@ fi
 
 echo "==> Installing ly login manager"
 yay -S --noconfirm ly
-sudo systemctl enable ly
+sudo systemctl enable ly@tty2.service
+sudo systemctl disable getty@tty2.service
 
 echo "==> Cloning dwl source"
 mkdir -p "$HOME/builds"
