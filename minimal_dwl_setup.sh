@@ -16,12 +16,12 @@ KEYMAP="dk"
 # ──────────────────────────────────────────────────────────────────────────────
 
 echo "==> Installing dependencies"
-sudo pacman -S --noconfirm \
+sudo pacman -S --needed --noconfirm \
     git \
     base-devel \
+    go \
     wayland \
     wayland-protocols \
-    wlroots \
     libxkbcommon \
     pixman \
     xcb-util-wm \
@@ -38,6 +38,7 @@ sudo pacman -S --noconfirm \
 
 echo "==> Installing yay"
 if ! command -v yay &> /dev/null; then
+    rm -rf /tmp/yay
     git clone https://aur.archlinux.org/yay.git /tmp/yay
     cd /tmp/yay
     makepkg -si --noconfirm
@@ -45,27 +46,44 @@ if ! command -v yay &> /dev/null; then
 fi
 
 echo "==> Installing ly login manager"
-yay -S --noconfirm ly
+yay -S --needed --noconfirm ly
 sudo systemctl enable ly@tty2.service
 sudo systemctl disable getty@tty2.service
 
-echo "==> Cloning dwl source"
+echo "==> Getting dwl source"
 mkdir -p "$HOME/builds"
-git clone https://codeberg.org/dwl/dwl.git "$DWL_DIR"
+if [ -d "$DWL_DIR/.git" ]; then
+    git -C "$DWL_DIR" pull
+else
+    git clone https://codeberg.org/dwl/dwl.git "$DWL_DIR"
+fi
+
+# Arch ships wlroots as versioned packages (wlroots0.19, wlroots0.20, ...).
+# Install whichever version this dwl checkout's Makefile asks for.
+echo "==> Installing matching wlroots"
+WLR_VER=$(grep -oP 'wlroots-\K[0-9]+\.[0-9]+' "$DWL_DIR/Makefile" | head -1 || true)
+if [ -z "$WLR_VER" ]; then
+    echo "!! Could not detect wlroots version from dwl Makefile, falling back to 0.20"
+    WLR_VER="0.20"
+fi
+echo "    dwl wants wlroots $WLR_VER"
+sudo pacman -S --needed --noconfirm "wlroots${WLR_VER}"
 
 echo "==> Creating dwl config"
 cp "$DWL_DIR/config.def.h" "$DWL_DIR/config.h"
 
-# Set Danish keyboard layout
-sed -i 's/.rules = NULL/.rules = NULL/' "$DWL_DIR/config.h"
-sed -i 's/.layout = NULL/.layout = "dk"/' "$DWL_DIR/config.h"
+# Set keyboard layout
+sed -i "s/.layout = NULL/.layout = \"$KEYMAP\"/" "$DWL_DIR/config.h"
 
 echo "==> Building and installing dwl"
 cd "$DWL_DIR"
+make clean
 make
 sudo make install
+cd ~
 
 echo "==> Creating dwl session file"
+sudo mkdir -p /usr/share/wayland-sessions
 sudo bash -c 'cat > /usr/share/wayland-sessions/dwl.desktop <<EOF
 [Desktop Entry]
 Name=dwl
